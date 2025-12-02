@@ -1,10 +1,11 @@
 use clap::Parser;
-use rand::Rng;
+use rand::Rng; // Nécessaire pour .random()
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::fs;
 use std::thread;
 use std::time::Duration;
+use std::process; // Pour exit(1)
 
 // ==========================================
 // CONFIGURATION & STRUCTURES
@@ -45,10 +46,9 @@ struct State {
     y: usize,
 }
 
-// Implémentation pour la PriorityQueue (Min-Heap par défaut en Rust c'est Max, donc on inverse)
 impl Ord for State {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.cost.cmp(&self.cost) // Inversion pour avoir le plus petit coût en premier
+        other.cost.cmp(&self.cost) // Min-heap
     }
 }
 
@@ -90,19 +90,19 @@ fn main() {
     let args = Args::parse();
 
     // 1. GENERATION DE MAP
-    // CORRECTION ICI : On utilise &args.generate pour ne pas "manger" la valeur
+    // Note: on utilise &args.generate pour ne pas consommer 'args'
     if let Some(dim_str) = &args.generate {
         let parts: Vec<&str> = dim_str.split('x').collect();
         if parts.len() != 2 {
             eprintln!("Invalid format. Use WxH (e.g., 10x10)");
-            return;
+            process::exit(1); // CORRECTION : Exit code 1
         }
         let w: usize = parts[0].parse().unwrap_or(10);
         let h: usize = parts[1].parse().unwrap_or(10);
 
         println!("Generating {}x{} hexadecimal grid...", w, h);
         
-        // CORRECTION ICI : thread_rng() devient rng() en rand 0.9
+        // CORRECTION : Rand 0.9+ syntaxe
         let mut rng = rand::rng();
         let mut cells = vec![0u8; w * h];
         
@@ -117,7 +117,7 @@ fn main() {
         // Affichage brut
         print_grid_values(&cells, w);
 
-        // Sauvegarde si demandée
+        // Sauvegarde
         if let Some(out_file) = &args.output {
             let mut content = String::new();
             for (i, val) in cells.iter().enumerate() {
@@ -126,6 +126,7 @@ fn main() {
             }
             if let Err(e) = fs::write(out_file, content) {
                 eprintln!("Error writing file: {}", e);
+                process::exit(1); // CORRECTION : Exit code 1
             } else {
                 println!("Map saved to: {}", out_file);
             }
@@ -140,7 +141,6 @@ fn main() {
     }
 
     // 2. LECTURE DE FICHIER
-    // CORRECTION ICI : On utilise &args.file
     if let Some(file_path) = &args.file {
         match fs::read_to_string(file_path) {
             Ok(content) => {
@@ -161,7 +161,7 @@ fn main() {
                 
                 if width == 0 || height == 0 {
                     eprintln!("Empty or invalid map file.");
-                    return;
+                    process::exit(1); // CORRECTION : Exit code 1
                 }
 
                 if args.generate.is_none() {
@@ -173,7 +173,10 @@ fn main() {
 
                 process_grid(Grid::new(width, height, cells), &args);
             }
-            Err(e) => eprintln!("Could not read file: {}", e),
+            Err(e) => {
+                eprintln!("Could not read file: {}", e);
+                process::exit(1); // CORRECTION : Exit code 1
+            }
         }
     }
 }
@@ -187,7 +190,6 @@ fn process_grid(grid: Grid, args: &Args) {
 
     if args.animate {
         println!("\nSearching for minimum cost path...");
-        // _cost préfixé par _ car on ne l'utilise pas ici
         let (path, _cost) = find_path(&grid, false, true);
         if let Some(p) = path {
              println!("\nStep {}: Path found!", p.len());
@@ -216,7 +218,6 @@ fn process_grid(grid: Grid, args: &Args) {
     if args.both {
         println!("\nMAXIMUM COST PATH:");
         println!("==================");
-        // On ignore le coût inversé retourné par Dijkstra
         let (max_path, _max_cost_inverted) = find_path(&grid, true, false);
         
         if let Some(path) = &max_path {
