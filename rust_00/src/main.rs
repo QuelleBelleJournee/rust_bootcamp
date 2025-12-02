@@ -18,6 +18,13 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    let name_to_display = if args.name.is_empty() {
+        "World"
+    } 
+    else {
+        &args.name
+    };
+
     let mut message = format!("Hello, {}!", args.name);
 
     if args.upper {
